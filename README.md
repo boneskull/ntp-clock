@@ -45,9 +45,8 @@ Note that the ESP8266 pin number *may not necessarily correspond* to the number 
 
 ## Flashing
 
-1. Clone this repo
-2. Enter your working copy directory
-3. To build with the default environment (with a D1 Mini), execute:
+1. Enter your working copy directory
+2. To build with the default environment (with a D1 Mini), execute:
 
   ```shell
   $ platformio run
@@ -60,7 +59,7 @@ Note that the ESP8266 pin number *may not necessarily correspond* to the number 
   ```
   
   You can specify a custom environment name with the `--environment=<name>` argument.
-4. If everything worked, the time separator on the display should blink a few times (this signifies it is negotiating with your AP), then you should see a time.  The time separator will continue to blink.  Ooh!
+3. If everything worked, the time separator on the display should blink a few times (this signifies it is negotiating with your AP), then you should see a time.  The time separator will continue to blink.  Ooh!
 
 > PRO TIP: If you're having `esptool` flake, try [`esptool.py`](https://github.com/themadinventor/esptool) instead.
 
