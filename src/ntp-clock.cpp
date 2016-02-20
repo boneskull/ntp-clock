@@ -127,8 +127,8 @@ void loop() {
       if (min != prevMin) {
         drawTime(timeClient.getHours(), timeClient.getMinutes());
         Serial.println("Updating time to " + timeClient.getFormattedTime());
+        prevMin = min;
       }
-      prevMin = min;
     }
 
     prevMillis = currentMillis;
