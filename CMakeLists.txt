@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.2)
 project(ntp-clock)
 
+set(PLATFORMIO_CMD "/usr/local/bin/platformio")
 include_directories("$ENV{HOME}/.platformio/packages/framework-arduinoespressif/variants/d1_mini")
 include_directories("$ENV{HOME}/.platformio/packages/framework-arduinoespressif/cores/esp8266")
 include_directories("$ENV{HOME}/.platformio/packages/framework-arduinoespressif/cores/esp8266/spiffs")
