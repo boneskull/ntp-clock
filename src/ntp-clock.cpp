@@ -92,8 +92,7 @@ uint8_t charToInt(char c) {
 }
 
 /**
- * Draws the time.  This is 24-hour time, but the hour may be one or two
- * digits; leave the first blank if there's only one digit.
+ * Draws the time.  Make adjustments for single-digit values.
  */
 void drawTime(String hours, String minutes) {
   if (hours.length() == 1) {
@@ -103,8 +102,13 @@ void drawTime(String hours, String minutes) {
     matrix.writeDigitNum(0, charToInt(hours.charAt(0)));
     matrix.writeDigitNum(1, charToInt(hours.charAt(1)));
   }
-  matrix.writeDigitNum(3, charToInt(minutes.charAt(0)));
-  matrix.writeDigitNum(4, charToInt(minutes.charAt(1)));
+  if (minutes.length() == 1) {
+    matrix.writeDigitNum(3, 0);
+    matrix.writeDigitNum(4, charToInt(minutes.charAt(0)));
+  } else {
+    matrix.writeDigitNum(3, charToInt(minutes.charAt(0)));
+    matrix.writeDigitNum(4, charToInt(minutes.charAt(1)));
+  }
 }
 
 /**
