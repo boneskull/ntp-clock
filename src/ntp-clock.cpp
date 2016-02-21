@@ -8,12 +8,16 @@
 #include <ESP8266WiFi.h>
 #include <NTPClient.h>
 #include <Adafruit_LEDBackpack.h>
+#include <Task.h>
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunused-parameter"
 #define SSID "YOUR WIFI NETWORK"
 #define PASS "AND ITS PASSWORD"
 #define TZ -8 // your time zone offset
 #define HOST "time.apple.com" // your favorite NTP server
 
+TaskManager taskManager;
 NTPClient timeClient(HOST, TZ * 3600);
 Adafruit_7segment matrix = Adafruit_7segment();
 
@@ -23,23 +27,27 @@ Adafruit_7segment matrix = Adafruit_7segment();
 bool colon = true;
 
 /**
- * Use these to avoid calls to delay() during the loop
- */
-unsigned long prevColonMillis = 0;
-unsigned long prevUpdateMillis = 0;
-
-/**
  * Check this in the loop; if it differs from what NTPClient tells us
  * then it's time to update the time.
  */
 unsigned long prevMin = 0;
 
+void toggleColon(uint32_t delta);
+void updateTime(uint32_t delta);
+void waitForConnection(uint32_t delta);
+void keepConnected(uint32_t delta);
+
+FunctionTask taskToggleColon(toggleColon, MsToTaskTime(500));
+FunctionTask taskUpdateTime(updateTime, MsToTaskTime(1000));
+FunctionTask taskWaitForConnection(waitForConnection, MsToTaskTime(250));
+FunctionTask taskKeepConnected(keepConnected, MsToTaskTime(250));
+
 /**
  * Toggles the colon state and writes the display.
  */
-void toggleColon() {
+void toggleColon(uint32_t delta) {
   colon = !colon;
-  matrix.drawColon((boolean)colon);
+  matrix.drawColon((boolean) colon);
   matrix.writeDisplay();
 }
 
@@ -48,7 +56,7 @@ void toggleColon() {
  */
 void reset() {
   matrix.clear();
-  colon = (boolean) false;
+  colon = false;
   matrix.writeDisplay();
 }
 
@@ -60,20 +68,34 @@ bool offline() {
 }
 
 /**
- * Connects to WiFi network.  Flashes colon during this phase.
+ * Pauses normal behavior and waits until we have a WiFi connection again,
+ * then resumes.
  */
-void connectWiFi() {
+void waitForConnection(uint32_t delta) {
+  toggleColon(delta);
+  if (!offline()) {
+    Serial.println("Connected to " + String(SSID));
+    taskManager.StopTask(&taskWaitForConnection);
+    taskManager.StartTask(&taskToggleColon);
+    taskManager.StartTask(&taskUpdateTime);
+    taskManager.StartTask(&taskKeepConnected);
+  }
+}
+
+/**
+ * Connects to WiFi network.  Flashes colon quickly during this phase.
+ */
+void keepConnected(uint32_t delta) {
   if (offline()) {
-    WiFi.begin(SSID, PASS);
+
+    taskManager.StopTask(&taskKeepConnected);
+    taskManager.StopTask(&taskToggleColon);
+    taskManager.StopTask(&taskUpdateTime);
 
     Serial.println("Connecting to " + String(SSID));
-    while (offline()) {
-      Serial.print('.');
-      toggleColon();
-      delay(250);
-    }
+    WiFi.begin(SSID, PASS);
 
-    Serial.println("Connected to " + String(SSID));
+    taskManager.StartTask(&taskWaitForConnection);
   }
 }
 
@@ -105,20 +127,6 @@ void drawTime(String hours, String minutes) {
 }
 
 /**
- * If a half-second or more has passed, toggle the colon display.
- * This should be run *after* the time has updated, because toggleColon()
- * is responsible for writing the display.
- */
-void maybeToggleColon(unsigned long millis) {
-  unsigned long colonDelta = millis - prevColonMillis;
-
-  if (colonDelta >= 500) {
-    toggleColon();
-    prevColonMillis = millis;
-  }
-}
-
-/**
  * If a second or more has passed, ensure WiFi connectivity, then check the NTP
  * client for the time.  Note the client will not actually ping the host more
  * than every 60s as configured.
@@ -126,18 +134,13 @@ void maybeToggleColon(unsigned long millis) {
  * If the time's "minute" value is not equal to the current value we're
  * displaying, then draw the new time and save its value.
  */
-void maybeUpdateTime(unsigned long millis) {
-  unsigned long updateDelta = millis - prevUpdateMillis;
-  if (updateDelta >= 1000) {
-    connectWiFi();
-    timeClient.update();
-    unsigned long min = (timeClient.getRawTime() % 3600) / 60;
-    if (min != prevMin) {
-      drawTime(timeClient.getHours(), timeClient.getMinutes());
-      Serial.println("Updating time to " + timeClient.getFormattedTime());
-      prevMin = min;
-    }
-    prevUpdateMillis = millis;
+void updateTime(uint32_t delta) {
+  timeClient.update();
+  unsigned long min = (timeClient.getRawTime() % 3600) / 60;
+  if (min != prevMin) {
+    drawTime(timeClient.getHours(), timeClient.getMinutes());
+    Serial.println("Updating time to " + timeClient.getFormattedTime());
+    prevMin = min;
   }
 }
 
@@ -151,8 +154,9 @@ void setup() {
   Serial.begin(115200);
   matrix.begin(0x70);
   reset();
-  connectWiFi();
-  reset();
+  taskManager.StartTask(&taskToggleColon);
+  taskManager.StartTask(&taskUpdateTime);
+  taskManager.StartTask(&taskKeepConnected);
 }
 
 /**
@@ -162,10 +166,9 @@ void setup() {
  * Keep WiFi connection alive.
  */
 void loop() {
-  maybeToggleColon(millis());
-  maybeUpdateTime(millis());
-  // call it a second time since the last operation may have taken >= 500ms
-  maybeToggleColon(millis());
+  taskManager.Loop();
 }
+
+#pragma clang diagnostic pop
 
 #pragma clang diagnostic pop
