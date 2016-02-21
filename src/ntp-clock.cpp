@@ -20,12 +20,13 @@ Adafruit_7segment matrix = Adafruit_7segment();
 /**
  * Is the colon supposed to be on or off?
  */
-boolean colon = (boolean) true;
+bool colon = true;
 
 /**
- * Use this to avoid calls to delay() during the loop
+ * Use these to avoid calls to delay() during the loop
  */
-unsigned long prevMillis = 0;
+unsigned long prevColonMillis = 0;
+unsigned long prevUpdateMillis = 0;
 
 /**
  * Check this in the loop; if it differs from what NTPClient tells us
@@ -37,8 +38,8 @@ unsigned long prevMin = 0;
  * Toggles the colon state and writes the display.
  */
 void toggleColon() {
-  colon = (boolean) !colon;
-  matrix.drawColon(colon);
+  colon = !colon;
+  matrix.drawColon((boolean)colon);
   matrix.writeDisplay();
 }
 
@@ -52,36 +53,28 @@ void reset() {
 }
 
 /**
- * Connects to WiFi network.  Flashes colon during this phase.
+ * Returns `true` if WiFi is offline.
  */
-void connectWiFi() {
-  if (WiFi.status() == WL_CONNECTED) {
-    return;
-  }
-
-  reset();
-
-  WiFi.begin(SSID, PASS);
-
-  Serial.println("Connecting to " + String(SSID));
-  while (WiFi.status() != WL_CONNECTED) {
-    Serial.print('.');
-    toggleColon();
-    delay(250);
-  }
-
-  Serial.println("Connected to " + String(SSID));
-
-  reset();
+bool offline() {
+  return WiFi.status() != WL_CONNECTED;
 }
 
 /**
- * Initializes matrix and connects to WiFi.
+ * Connects to WiFi network.  Flashes colon during this phase.
  */
-void setup() {
-  Serial.begin(115200);
-  matrix.begin(0x70);
-  connectWiFi();
+void connectWiFi() {
+  if (offline()) {
+    WiFi.begin(SSID, PASS);
+
+    Serial.println("Connecting to " + String(SSID));
+    while (offline()) {
+      Serial.print('.');
+      toggleColon();
+      delay(250);
+    }
+
+    Serial.println("Connected to " + String(SSID));
+  }
 }
 
 /**
@@ -112,31 +105,67 @@ void drawTime(String hours, String minutes) {
 }
 
 /**
+ * If a half-second or more has passed, toggle the colon display.
+ * This should be run *after* the time has updated, because toggleColon()
+ * is responsible for writing the display.
+ */
+void maybeToggleColon(unsigned long millis) {
+  unsigned long colonDelta = millis - prevColonMillis;
+
+  if (colonDelta >= 500) {
+    toggleColon();
+    prevColonMillis = millis;
+  }
+}
+
+/**
+ * If a second or more has passed, ensure WiFi connectivity, then check the NTP
+ * client for the time.  Note the client will not actually ping the host more
+ * than every 60s as configured.
+ *
+ * If the time's "minute" value is not equal to the current value we're
+ * displaying, then draw the new time and save its value.
+ */
+void maybeUpdateTime(unsigned long millis) {
+  unsigned long updateDelta = millis - prevUpdateMillis;
+  if (updateDelta >= 1000) {
+    connectWiFi();
+    timeClient.update();
+    unsigned long min = (timeClient.getRawTime() % 3600) / 60;
+    if (min != prevMin) {
+      drawTime(timeClient.getHours(), timeClient.getMinutes());
+      Serial.println("Updating time to " + timeClient.getFormattedTime());
+      prevMin = min;
+    }
+    prevUpdateMillis = millis;
+  }
+}
+
+#pragma clang diagnostic push
+#pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
+
+/**
+ * Initializes matrix and connects to WiFi.
+ */
+void setup() {
+  Serial.begin(115200);
+  matrix.begin(0x70);
+  reset();
+  connectWiFi();
+  reset();
+}
+
+/**
  * Flashes colon on/off every second.
  * Asks the NTP client for an update every second; if the minute has changed,
  * then update the display.
  * Keep WiFi connection alive.
  */
 void loop() {
-  unsigned long currentMillis = millis();
-  unsigned long delta = currentMillis - prevMillis;
-
-  if (delta >= 500) {
-    if (delta >= 1000) {
-      connectWiFi();
-
-      timeClient.update();
-
-      unsigned long min = (timeClient.getRawTime() % 3600) / 60;
-      if (min != prevMin) {
-        drawTime(timeClient.getHours(), timeClient.getMinutes());
-        Serial.println("Updating time to " + timeClient.getFormattedTime());
-        prevMin = min;
-      }
-    }
-
-    prevMillis = currentMillis;
-
-    toggleColon();
-  }
+  maybeToggleColon(millis());
+  maybeUpdateTime(millis());
+  // call it a second time since the last operation may have taken >= 500ms
+  maybeToggleColon(millis());
 }
+
+#pragma clang diagnostic pop

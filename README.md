@@ -48,20 +48,39 @@ Note that the ESP8266 pin number *may not necessarily correspond* to the number 
 1. Enter your working copy directory
 2. To build with the default environment (with a D1 Mini), execute:
 
-  ```shell
-  $ platformio run
-  ```
-  
-  If this was successful, then we can upload:
-  
-  ```shell
-  $ platformio run --target upload
-  ```
-  
-  You can specify a custom environment name with the `--environment=<name>` argument.
-3. If everything worked, the time separator on the display should blink a few times (this signifies it is negotiating with your AP), then you should see a time.  The time separator will continue to blink.  Ooh!
+    ```shell
+    $ platformio run
+    ```
 
-> PRO TIP: If you're having `esptool` flake, try [`esptool.py`](https://github.com/themadinventor/esptool) instead.
+    If this was successful, then we can upload:
+
+    ```shell
+    $ platformio run --target upload
+    ```
+
+    You can specify a custom environment name with the `--environment=<name>` argument.
+4. If everything worked, the time separator on the display should blink a few times (this signifies it is negotiating with your AP), then you should see a time.  The time separator will continue to blink.  Ooh!
+
+### Troubleshooting
+
+If you're experiencing `esptool` flake, e.g.:
+
+```
+espcomm_send_command: sending command header
+espcomm_send_command: sending command payload
+espcomm_send_command: receiving 2 bytes of data
+warning: espcomm_send_command: wrong direction/command: 0x01 0x07, expected 0x01 0x08
+warning: espcomm_sync failed
+error: espcomm_open failed
+```
+
+I recommend trying [`esptool.py`](https://github.com/themadinventor/esptool) instead.  After a failed upload, flash the resulting `firmware.bin` like so:
+
+```shell
+$ esptool.py --baud 230400 --port /dev/tty.whatever write_flash 0x00000 /path/to/firmware.bin
+```
+
+> Note: you must actually *attempt* the upload for the `.bin` to be created from the `.elf`.  If anyone knows what command to run to create the `.bin` w/o uploading, I'm all ears.
 
 ### Alternatives
 
