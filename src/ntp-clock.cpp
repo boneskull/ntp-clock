@@ -171,5 +171,3 @@ void loop() {
 }
 
 #pragma clang diagnostic pop
-
-#pragma clang diagnostic pop
