@@ -151,6 +151,7 @@ void updateTime(uint32_t delta) {
  * Initializes matrix and connects to WiFi.
  */
 void setup() {
+  WiFi.mode(WIFI_STA);
   Serial.begin(115200);
   matrix.begin(0x70);
   reset();
