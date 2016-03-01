@@ -1,1 +1,3 @@
 .pioenvs
+CMakeListsPrivate.txt
+lib/readme.txt
